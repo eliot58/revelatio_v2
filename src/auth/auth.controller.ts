@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpCode, Get, Query } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode, Get, Query, Headers, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CHAIN } from '@tonconnect/ui-react';
 
@@ -22,7 +22,19 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('check_proof')
-  async checkProof(@Body() data: any) {
-    return await this.authService.checkProof(data);
+  async checkProof(
+    @Body() data: any,
+    @Headers('Authorization') authorization?: string,
+  ) {
+    if (!authorization) {
+      throw new UnauthorizedException('Missing Authorization header');
+    }
+
+    const initData =
+      authorization.startsWith('initData ')
+        ? authorization.slice('initData '.length).trim()
+        : authorization.trim();
+
+    return await this.authService.checkProof(data, initData);
   }
 }
