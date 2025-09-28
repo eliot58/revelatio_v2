@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Revelatio</title>
+  <style>
+    html, body { height: 100%; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    .wrap { display: grid; gap: 16px; justify-items: center; }
+    #connect { display: flex; align-items: center; justify-content: center; }
+
+    .actions {
+      display: grid;
+      gap: 12px;
+      grid-auto-rows: min-content;
+      width: min(92vw, 520px);
+    }
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 12px;
+      background: #1a1a1a;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint { opacity: 0.7; font-size: 14px; text-align: center; }
+
+    .copy-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      width: 100%;
+    }
+    .copy-row input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #222;
+      background: #0d0d0d;
+      color: #fff;
+      font-family: inherit;
+    }
+
+    pre {
+      width: min(92vw, 760px);
+      max-height: 50vh;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      background: #0d0d0d;
+      border: 1px solid #222;
+      border-radius: 12px;
+    }
+
+    /* ---------- Modal ---------- */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal {
+      width: min(92vw, 520px);
+      background: #0d0d0d;
+      border: 1px solid #222;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      animation: pop .12s ease-out;
+    }
+    .modal h3 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal p { margin: 0; opacity: .9; }
+    .modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal button {
+      background: #1f1f1f;
+      border: 1px solid #2a2a2a;
+    }
+    @keyframes pop { from { transform: scale(.98); opacity: .6; } to { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div id="connect"></div>
+
+    <div class="actions" id="actions" style="display:none">
+      <div class="hint">You are authorized. Request access to chats:</div>
+
+      <div class="copy-row" id="copy-block" style="display:none">
+        <input id="invite-link" type="text" readonly placeholder="Invite link will appear here" />
+        <button id="copy-btn" aria-label="Copy invite link">Copy</button>
+      </div>
+
+      <button id="btn-dao" disabled>Request access — Grouche DAO</button>
+      <button id="btn-whales" disabled>Request access — Grouche Whales</button>
+      <button id="btn-notwise" disabled>Request access — NotWise holders</button>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <h3 id="modal-title">Error</h3>
+      <p id="modal-message">Something went wrong</p>
+      <div class="row">
+        <button id="modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    function showModal(message, title = 'Error') {
+      $('#modal-title').textContent = title;
+      $('#modal-message').textContent = message;
+      $('#modal-backdrop').style.display = 'flex';
+    }
+    function hideModal() { $('#modal-backdrop').style.display = 'none'; }
+    $('#modal-close').addEventListener('click', hideModal);
+    $('#modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'modal-backdrop') hideModal(); });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideModal(); });
+
+    function setCopyLink(link) {
+      const block = $('#copy-block');
+      const input = $('#invite-link');
+      input.value = link || '';
+      block.style.display = link ? 'grid' : 'none';
+    }
+    $('#copy-btn').addEventListener('click', async () => {
+      const btn = $('#copy-btn');
+      const val = $('#invite-link').value;
+      if (!val) return;
+      try {
+        await navigator.clipboard.writeText(val);
+        const prev = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => (btn.textContent = prev), 1200);
+      } catch {
+        showModal('Cannot access clipboard. Copy the link manually.');
+      }
+    });
+
+    // ---------- API service ----------
+    class TonProofDemoApiService {
+      localStorageKey = 'access-token';
+      host = 'https://demo.tonconnect.dev';
+      accessToken = null;
+      refreshIntervalMs = 9 * 60 * 1000;
+
+      constructor() {
+        this.accessToken = localStorage.getItem(this.localStorageKey);
+        if (!this.accessToken) this.generatePayload();
+      }
+
+      async generatePayload() {
+        try {
+          const res = await fetch(`${this.host}/ton-proof/generatePayload`, { method: 'POST' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          return { tonProof: data.payload };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async checkProof(proof, account) {
+        try {
+          const reqBody = {
+            address: account.address,
+            network: account.chain,
+            proof: { ...proof, state_init: account.walletStateInit },
+          };
+          const res = await fetch(`${this.host}/ton-proof/checkProof`, {
+            method: 'POST',
+            body: JSON.stringify(reqBody),
+          });
+          const data = await res.json();
+          if (data?.token) {
+            localStorage.setItem(this.localStorageKey, data.token);
+            this.accessToken = data.token;
+          }
+        } catch (e) {
+          console.log('checkProof error:', e);
+        }
+      }
+
+      async requestChatAccess({ chatId }) {
+        const res = await fetch(`${this.host}/chats/request-access`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ chatId }),
+        });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { raw: text }; }
+        return { ok: res.ok, status: res.status, data: json };
+      }
+
+      reset() {
+        this.accessToken = null;
+        localStorage.removeItem(this.localStorageKey);
+        this.generatePayload();
+      }
+    }
+
+    const TonProofDemoApi = new TonProofDemoApiService();
+
+    const actionsEl = $('#actions');
+    const btnDao = $('#btn-dao');
+    const btnWhales = $('#btn-whales');
+    const btnNotwise = $('#btn-notwise');
+
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: 'https://raw.githubusercontent.com/eliot58/grouche_api/refs/heads/main/tonconnect-manifest.json',
+      buttonRootId: 'connect'
+    });
+    tonConnectUI.uiOptions = { uiPreferences: { theme: 'DARK' } };
+
+    let firstProofLoading = true;
+    const recreateProofPayload = async () => {
+      if (firstProofLoading) {
+        // В последних версиях используйте setConnectRequestParameters под капотом UI SDK
+        if (typeof tonConnectUI.setConnectRequestParameters === 'function') {
+          tonConnectUI.setConnectRequestParameters({ state: 'loading' });
+        }
+        firstProofLoading = false;
+      }
+      const payload = await TonProofDemoApi.generatePayload();
+      if (typeof tonConnectUI.setConnectRequestParameters === 'function') {
+        if (payload) tonConnectUI.setConnectRequestParameters({ state: 'ready', value: payload });
+        else tonConnectUI.setConnectRequestParameters(null);
+      }
+    };
+    recreateProofPayload();
+    setInterval(recreateProofPayload, TonProofDemoApi.refreshIntervalMs);
+
+    let authorized = false;
+    let lastAccount = null;
+
+    tonConnectUI.onStatusChange(async (w) => {
+      // Скрываем поле ссылки при любом изменении статуса
+      setCopyLink('');
+
+      if (!w || w.account?.chain === TON_CONNECT_UI.CHAIN.TESTNET) {
+        TonProofDemoApi.reset();
+        authorized = false;
+        lastAccount = null;
+        setButtonsEnabled(false);
+        actionsEl.style.display = 'none';
+        return;
+      }
+
+      if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
+        await TonProofDemoApi.checkProof(w.connectItems.tonProof.proof, w.account);
+      }
+
+      if (!TonProofDemoApi.accessToken) {
+        tonConnectUI.disconnect();
+        authorized = false;
+        lastAccount = null;
+        setButtonsEnabled(false);
+        actionsEl.style.display = 'none';
+        return;
+      }
+
+      authorized = true;
+      lastAccount = w.account;
+      actionsEl.style.display = 'grid';
+      setButtonsEnabled(true);
+    });
+
+    function setButtonsEnabled(en) {
+      btnDao.disabled = !en;
+      btnWhales.disabled = !en;
+      btnNotwise.disabled = !en;
+    }
+
+    const CHATS = {
+      dao: { id: 1, label: 'Grouche DAO' },
+      whales: { id: 2, label: 'Grouche Whales' },
+      notwise: { id: 3, label: 'NotWise holders' },
+    };
+
+    async function requestAccess(chat) {
+      if (!authorized || !lastAccount) return;
+      setButtonsEnabled(false);
+      outputEl.textContent = '...';
+
+      try {
+        const resp = await TonProofDemoApi.requestChatAccess({ chatId: chat.id });
+
+        if (!resp.ok) {
+          // Читаем текст ошибки из типичных полей
+          const errMsg =
+            resp.data?.message ||
+            resp.data?.error ||
+            (typeof resp.data === 'string' ? resp.data : '') ||
+            `Request failed with status ${resp.status}`;
+          showModal(errMsg);
+          setCopyLink('');
+          return;
+        }
+
+        // Ищем ссылку в возможных полях ответа
+        const link =
+          resp.data?.inviteLink ||
+          resp.data?.link ||
+          resp.data?.url ||
+          resp.data?.data?.inviteLink ||
+          resp.data?.data?.link ||
+          resp.data?.data?.url ||
+          '';
+
+        if (link) {
+          setCopyLink(link);
+        } else {
+          showModal('Access granted, but no invite link was returned by the server.', 'Notice');
+          setCopyLink('');
+        }
+      } catch (e) {
+        console.error(e);
+        showModal('Network error. Please try again later.');
+        setCopyLink('');
+      } finally {
+        setButtonsEnabled(true);
+      }
+    }
+
+    btnDao.addEventListener('click', () => requestAccess(CHATS.dao));
+    btnWhales.addEventListener('click', () => requestAccess(CHATS.whales));
+    btnNotwise.addEventListener('click', () => requestAccess(CHATS.notwise));
+  </script>
+</body>
+</html>
