@@ -1,40 +1,40 @@
-import { Body, Controller, Post, HttpCode, Get, Query, Headers, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CHAIN } from '@tonconnect/ui-react';
+import { AuthGuard } from './auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { RequestWithAuth } from './auth.types';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  @Get('test')
-  async getToken(
-    @Query('address') address: string,
-    @Query('network') network: CHAIN,
+  @Post('user')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  async getUser(
+    @Req() request: RequestWithAuth
   ) {
-    return await this.authService.generateAuthToken(address, network);
+    return await this.authService.getUser(request.tgId);
   }
 
   @HttpCode(200)
-  @Post('generate_payload')
-  generatePayload() {
-    return this.authService.generatePayload();
+  @Post('connect')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  async connect(
+    @Req() request: RequestWithAuth,
+    @Body() data: any
+  ) {
+    return await this.authService.connect(request.tgId, data);
   }
 
   @HttpCode(200)
-  @Post('check_proof')
-  async checkProof(
-    @Body() data: any,
-    @Headers('Authorization') authorization?: string,
+  @Post('disconnect')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  async disconnect(
+    @Req() request: RequestWithAuth
   ) {
-    if (!authorization) {
-      throw new UnauthorizedException('Missing Authorization header');
-    }
-
-    const initData =
-      authorization.startsWith('initData ')
-        ? authorization.slice('initData '.length).trim()
-        : authorization.trim();
-
-    return await this.authService.checkProof(data, initData);
+    return await this.authService.disconnect(request.tgId);
   }
 }

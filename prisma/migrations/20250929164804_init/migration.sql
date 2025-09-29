@@ -4,7 +4,7 @@ CREATE TYPE "public"."Chat" AS ENUM ('grouche_dao', 'grouche_whales', 'notwise_h
 -- CreateTable
 CREATE TABLE "public"."User" (
     "tgId" BIGINT NOT NULL,
-    "wallet" TEXT NOT NULL,
+    "wallet" TEXT,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("tgId")
 );
@@ -18,9 +18,6 @@ CREATE TABLE "public"."Member" (
 
     CONSTRAINT "Member_pkey" PRIMARY KEY ("userId","chat")
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_wallet_key" ON "public"."User"("wallet");
 
 -- CreateIndex
 CREATE INDEX "Member_chat_idx" ON "public"."Member"("chat");

@@ -15,17 +15,17 @@ datasource db {
 }
 
 model User {
-  tgId   BigInt @id
-  wallet String @unique
+  tgId   BigInt  @id
+  wallet String?
 
   memberships Member[]
 }
 
 model Member {
-  chat   Chat
+  chat      Chat
 
-  userId BigInt
-  user   User   @relation(fields: [userId], references: [tgId], onDelete: Cascade)
+  userId    BigInt
+  user      User   @relation(fields: [userId], references: [tgId], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

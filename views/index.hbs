@@ -65,138 +65,331 @@
             font-size: 14px;
             text-align: center;
         }
+
+        .row {
+            display: grid;
+            gap: 8px;
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
+        }
+
+        /* profile */
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #111;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pname {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .puser {
+            font-size: 14px;
+            opacity: .7;
+        }
+
+        /* link box */
+        .linkbox {
+            display: grid;
+            gap: 8px;
+            padding: 12px;
+            border: 1px solid #222;
+            border-radius: 12px;
+            background: #0b0b0b;
+        }
+
+        .linkbox .url {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #2a2a2a;
+            background: #121212;
+            color: #fff;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .copy-row {
+            display: grid;
+            grid-auto-flow: column;
+            gap: 8px;
+        }
+
+        .copy-ok {
+            font-size: 12px;
+            opacity: .7;
+            text-align: center;
+        }
     </style>
 </head>
 
 <body>
     <div class="wrap">
+        <!-- Профиль -->
+        <div id="profile" class="profile" style="display:none">
+            <div id="profile-avatar" class="avatar"></div>
+            <div>
+                <div id="profile-name" class="pname"></div>
+                <div id="profile-username" class="puser"></div>
+            </div>
+        </div>
+
         <div id="connect"></div>
 
-        <div class="actions" id="actions" style="display:none">
-            <div class="hint">You are authorized. Choose a chat:</div>
+        <div class="actions" id="section-auth" style="display:none">
+            <div id="auth-hint" class="hint"></div>
+            <div class="row">
+                <button id="btn-connect" style="display:none">Connect wallet</button>
+                <button id="btn-disconnect" style="display:none">Disconnect</button>
+            </div>
+        </div>
+
+        <div class="actions" id="section-links" style="display:none">
+            <div class="hint">Request a one-time invite link:</div>
             <button id="btn-dao" disabled>Grouche DAO</button>
             <button id="btn-whales" disabled>Grouche Whales</button>
-            <button id="btn-notwise" disabled>NotWise holders</button>
+            <button id="btn-notwise" disabled>NOTWise holders</button>
+
+            <!-- вывод ссылки для копирования -->
+            <div id="link-box" class="linkbox" style="display:none">
+                <input id="link-output" class="url" type="text" readonly value="">
+                <div class="copy-row">
+                    <button id="btn-copy">Copy</button>
+                    <button id="btn-clear">Clear</button>
+                </div>
+                <div id="copy-ok" class="copy-ok" style="display:none">Copied ✔</div>
+            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        let tg = window.Telegram.WebApp;
-
+        const tg = window.Telegram.WebApp;
         const $ = (s) => document.querySelector(s);
 
-        class TonProofDemoApiService {
-            localStorageKey = 'access-token';
-            host = 'https://revapi.masonsplay.dev';
-            accessToken = null;
-            refreshIntervalMs = 9 * 60 * 1000;
+        // ---------- API ----------
+        const API_HOST = 'https://revapi.masonsplay.dev';
 
-            constructor() {
-                this.accessToken = localStorage.getItem(this.localStorageKey);
-                if (!this.accessToken) this.generatePayload();
-            }
-            async generatePayload() {
-                try {
-                    const res = await fetch(`${this.host}/auth/generate_payload`, { method: 'POST' });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const data = await res.json();
-                    return { tonProof: data.payload };
-                } catch { return null; }
-            }
-            async checkProof(proof, account) {
-                try {
-                    const reqBody = { address: account.address, network: account.chain, proof: { ...proof, state_init: account.walletStateInit } };
-                    const res = await fetch(`${this.host}/auth/check_proof`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                Authorization: `initData ${tg.initData}`
-                            },
-                            body: JSON.stringify(reqBody),
-                        }
-                    );
-                    const data = await res.json();
-                    if (data?.token) {
-                        localStorage.setItem(this.localStorageKey, data.token);
-                        this.accessToken = data.token;
-                    }
-                } catch (e) { console.log('checkProof error:', e); }
-            }
-            reset() { this.accessToken = null; localStorage.removeItem(this.localStorageKey); this.generatePayload(); }
+        async function apiGetUser() {
+            const res = await fetch(`${API_HOST}/auth/user`, {
+                headers: { Authorization: `initData ${tg.initData}` }
+            });
+            return res.json();
         }
-        const TonProofDemoApi = new TonProofDemoApiService();
 
-        const actionsEl = $('#actions');
+        async function apiConnect(proof, account) {
+            const body = {
+                address: account.address,
+                network: account.chain,
+                proof: { ...proof, state_init: account.walletStateInit }
+            };
+            const res = await fetch(`${API_HOST}/auth/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `initData ${tg.initData}` },
+                body: JSON.stringify(body),
+            });
+            return res.json();
+        }
+
+        async function apiDisconnect() {
+            const res = await fetch(`${API_HOST}/auth/disconnect`, {
+                method: 'POST',
+                headers: { Authorization: `initData ${tg.initData}` }
+            });
+            return res.json();
+        }
+
+        async function apiOneTimeLink(kind) {
+            const res = await fetch(`${API_HOST}/links/${kind}`, {
+                method: 'POST',
+                headers: { Authorization: `initData ${tg.initData}` }
+            });
+            return res.json();
+        }
+
+        // ---------- UI state ----------
+        const sectionAuth = $('#section-auth');
+        const sectionLinks = $('#section-links');
+        const btnConnect = $('#btn-connect');
+        const btnDisconnect = $('#btn-disconnect');
         const btnDao = $('#btn-dao');
         const btnWhales = $('#btn-whales');
         const btnNotwise = $('#btn-notwise');
+        const authHint = $('#auth-hint');
 
+        const profile = $('#profile');
+        const profileAvatar = $('#profile-avatar');
+        const profileName = $('#profile-name');
+        const profileUsername = $('#profile-username');
+
+        const linkBox = $('#link-box');
+        const linkOutput = $('#link-output');
+        const btnCopy = $('#btn-copy');
+        const btnClear = $('#btn-clear');
+        const copyOk = $('#copy-ok');
+
+        function renderProfile() {
+            const u = tg?.initDataUnsafe?.user;
+            if (!u) return;
+
+            // аватар
+            profileAvatar.innerHTML = '';
+            if (u.photo_url) {
+                const img = document.createElement('img');
+                img.src = u.photo_url;
+                img.alt = 'avatar';
+                profileAvatar.appendChild(img);
+            } else {
+                const initials = ((u.first_name?.[0] ?? u.username?.[0] ?? 'U') + (u.last_name?.[0] ?? '')).toUpperCase();
+                profileAvatar.textContent = initials;
+            }
+
+            const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ');
+            profileName.textContent = fullName || (u.username ? `@${u.username}` : `User #${u.id}`);
+            profileUsername.textContent = u.username ? `@${u.username}` : `id: ${u.id}`;
+            profile.style.display = 'flex';
+        }
+
+        function showAuth(wallet) {
+            sectionAuth.style.display = 'grid';
+            const connected = !!wallet;
+            authHint.textContent = connected ? `Wallet linked: ${wallet}` : 'No wallet linked';
+            btnConnect.style.display = connected ? 'none' : 'inline-block';
+            btnDisconnect.style.display = connected ? 'inline-block' : 'none';
+
+            sectionLinks.style.display = connected ? 'grid' : 'none';
+            [btnDao, btnWhales, btnNotwise].forEach(b => b.disabled = !connected);
+
+            // очищаем ссылку при смене состояния
+            if (!connected) clearLink();
+        }
+
+        function setLink(url) {
+            linkOutput.value = url || '';
+            linkBox.style.display = url ? 'grid' : 'none';
+            copyOk.style.display = 'none';
+        }
+
+        function clearLink() { setLink(''); }
+
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    // fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = text; document.body.appendChild(ta);
+                    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                }
+                copyOk.style.display = 'block';
+                setTimeout(() => (copyOk.style.display = 'none'), 1500);
+            } catch (e) {
+                alert('Failed to copy');
+            }
+        }
+
+        // ---------- TonConnect UI ----------
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
             manifestUrl: 'https://raw.githubusercontent.com/eliot58/grouche_api/refs/heads/main/tonconnect-manifest.json',
-            buttonRootId: 'connect'
+            buttonRootId: 'connect',
         });
         tonConnectUI.uiOptions = { uiPreferences: { theme: 'DARK' } };
 
-        let firstProofLoading = true;
-        const recreateProofPayload = async () => {
-            if (firstProofLoading) {
-                tonConnectUI.setConnectRequestParameters({ state: 'loading' });
-                firstProofLoading = false;
-            }
-            const payload = await TonProofDemoApi.generatePayload();
-            tonConnectUI.setConnectRequestParameters(payload ? { state: 'ready', value: payload } : null);
-        };
-        recreateProofPayload();
-        setInterval(recreateProofPayload, TonProofDemoApi.refreshIntervalMs);
-
-        let authorized = false;
-
-        tonConnectUI.onStatusChange(async (w) => {
-            if (!w || w.account?.chain === TON_CONNECT_UI.CHAIN.TESTNET) {
-                TonProofDemoApi.reset();
-                authorized = false;
-                setButtonsEnabled(false);
-                actionsEl.style.display = 'none';
+        // payload = id (как просили)
+        async function setupProofPayload() {
+            const payload = tg?.initDataUnsafe?.user?.id;
+            if (!payload) {
+                tonConnectUI.setConnectRequestParameters(null);
                 return;
             }
-
-            if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
-                await TonProofDemoApi.checkProof(w.connectItems.tonProof.proof, w.account);
-            }
-
-            if (!TonProofDemoApi.accessToken) {
-                tonConnectUI.disconnect();
-                authorized = false;
-                setButtonsEnabled(false);
-                actionsEl.style.display = 'none';
-                return;
-            }
-
-            authorized = true;
-            actionsEl.style.display = 'grid';
-            setButtonsEnabled(true);
-        });
-
-        function setButtonsEnabled(en) {
-            btnDao.disabled = !en;
-            btnWhales.disabled = !en;
-            btnNotwise.disabled = !en;
+            tonConnectUI.setConnectRequestParameters({
+                state: 'ready',
+                value: { tonProof: String(payload) },
+            });
         }
 
-        const CHATS = {
-            dao: 'https://t.me/+3Xt4mf5MSY1hYWZi',
-            whales: 'https://t.me/+HWeSSe6NA1xjOWMy',
-            notwise: 'https://t.me/+tpwewNFYvx1hMzUy',
-        };
+        // init
+        (async function bootstrap() {
+            renderProfile();
+            await setupProofPayload();
 
-        const openLink = (url) => window.open(url, '_blank', 'noopener,noreferrer');
+            try {
+                const resp = await apiGetUser();
+                showAuth(resp?.data?.wallet ?? null);
+            } catch {
+                showAuth(null);
+            }
+        })();
 
-        btnDao.addEventListener('click', () => authorized && openLink(CHATS.dao));
-        btnWhales.addEventListener('click', () => authorized && openLink(CHATS.whales));
-        btnNotwise.addEventListener('click', () => authorized && openLink(CHATS.notwise));
+        // Кнопки
+        btnConnect.addEventListener('click', () => tonConnectUI.openModal());
+        btnDisconnect.addEventListener('click', async () => {
+            btnDisconnect.disabled = true;
+            try {
+                await apiDisconnect();
+                showAuth(null);
+            } finally {
+                btnDisconnect.disabled = false;
+            }
+        });
+
+        // одноразовые ссылки (теперь не открываем автоматически)
+        async function requestLink(kind, btn) {
+            btn.disabled = true;
+            setLink(''); // очистим предыдущую
+            try {
+                const r = await apiOneTimeLink(kind);
+                const url = r?.data?.url ?? '';
+                if (url) setLink(url);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        btnDao.addEventListener('click', () => requestLink('dao', btnDao));
+        btnWhales.addEventListener('click', () => requestLink('whales', btnWhales));
+        btnNotwise.addEventListener('click', () => requestLink('notwise', btnNotwise));
+
+        btnCopy.addEventListener('click', () => {
+            if (linkOutput.value) copyToClipboard(linkOutput.value);
+        });
+        btnClear.addEventListener('click', clearLink);
+
+        // TonConnect события
+        tonConnectUI.onStatusChange(async (w) => {
+            if (!w || w.account?.chain === TON_CONNECT_UI.CHAIN.TESTNET) {
+                showAuth(null);
+                return;
+            }
+            if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
+                const resp = await apiConnect(w.connectItems.tonProof.proof, w.account);
+                const wallet = resp?.data?.wallet ?? null;
+                showAuth(wallet);
+            }
+        });
     </script>
 </body>
 

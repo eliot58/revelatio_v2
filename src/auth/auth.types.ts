@@ -1,9 +1,7 @@
-import { CHAIN } from '@tonconnect/ui-react';
 import { FastifyRequest } from 'fastify';
 
 export type AuthPayload = {
-  address: string;
-  network: CHAIN;
+  tgId: bigint;
 };
 
 export type RequestWithAuth = FastifyRequest & AuthPayload;
