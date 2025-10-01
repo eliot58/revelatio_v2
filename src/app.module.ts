@@ -8,6 +8,7 @@ import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { LinksModule } from './links/links.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { TelegramModule } from './telegram/telegram.module';
     ScheduleModule.forRoot(),
     AuthModule,
     NotificationsModule,
-    TelegramModule
+    TelegramModule,
+    LinksModule
   ],
   controllers: [AppController],
   providers: [

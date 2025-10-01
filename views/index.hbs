@@ -155,8 +155,6 @@
             </div>
         </div>
 
-        <div id="connect"></div>
-
         <div class="actions" id="section-auth" style="display:none">
             <div id="auth-hint" class="hint"></div>
             <div class="row">
@@ -313,8 +311,7 @@
 
         // ---------- TonConnect UI ----------
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://raw.githubusercontent.com/eliot58/grouche_api/refs/heads/main/tonconnect-manifest.json',
-            buttonRootId: 'connect',
+            manifestUrl: 'https://raw.githubusercontent.com/eliot58/grouche_api/refs/heads/main/tonconnect-manifest.json'
         });
         tonConnectUI.uiOptions = { uiPreferences: { theme: 'DARK' } };
 
