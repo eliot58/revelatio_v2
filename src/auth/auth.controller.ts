@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpCode, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode, UseGuards, Req, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -8,7 +8,7 @@ import { RequestWithAuth } from './auth.types';
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  @Post('user')
+  @Get('user')
   @ApiBearerAuth()
   @UseGuards(AuthGuard)
   async getUser(
