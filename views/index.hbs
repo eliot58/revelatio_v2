@@ -183,6 +183,7 @@
 
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/tonweb.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const $ = (s) => document.querySelector(s);
@@ -249,6 +250,30 @@
         const btnClear = $('#btn-clear');
         const copyOk = $('#copy-ok');
 
+        function formatTonAddress(addr, opts = {}) {
+            const {
+                bounceable = true,
+                urlSafe = true,
+                testOnly = false
+            } = opts;
+
+            try {
+                if (typeof TonWeb === 'undefined' || !TonWeb?.utils?.Address) {
+                    return addr ?? '';
+                }
+                const a = new TonWeb.utils.Address(String(addr));
+                return a.toString(bounceable, urlSafe, testOnly);
+            } catch {
+                return addr ?? '';
+            }
+        }
+
+        function shortAddr(addr, opts) {
+            const fa = formatTonAddress(addr, opts);
+            if (!fa) return '';
+            return fa.length > 16 ? `${fa.slice(0, 8)}…${fa.slice(-6)}` : fa;
+        }
+
         function renderProfile() {
             const u = tg?.initDataUnsafe?.user;
             if (!u) return;
@@ -274,16 +299,28 @@
         function showAuth(wallet) {
             sectionAuth.style.display = 'grid';
             const connected = !!wallet;
-            authHint.textContent = connected ? `Wallet linked: ${wallet}` : 'No wallet linked';
+
+            // форматируем "красиво"
+            const pretty = connected ? formatTonAddress(wallet, {
+                bounceable: true,   // обычно true для отображения
+                urlSafe: true,      // удобная base64url форма
+                testOnly: false     // вы же на mainnet — оставьте false
+            }) : '';
+
+            // компактный вариант в подсказке
+            authHint.textContent = connected
+                ? `Wallet linked: ${shortAddr(pretty)}`
+                : 'No wallet linked';
+
             btnConnect.style.display = connected ? 'none' : 'inline-block';
             btnDisconnect.style.display = connected ? 'inline-block' : 'none';
 
             sectionLinks.style.display = connected ? 'grid' : 'none';
             [btnDao, btnWhales, btnNotwise].forEach(b => b.disabled = !connected);
 
-            // очищаем ссылку при смене состояния
             if (!connected) clearLink();
         }
+
 
         function setLink(url) {
             linkOutput.value = url || '';
