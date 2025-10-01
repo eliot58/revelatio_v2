@@ -27,10 +27,12 @@ export class LinksService {
         const chatId = ChatIdMap[chat];
         if (!chatId) throw new InternalServerErrorException('Chat is not configured');
 
+        const expireSec = 5 * 60;
+        const expire_date = Math.floor(Date.now() / 1000) + expireSec;
 
         const res = await this.bot.api.createChatInviteLink(chatId, {
-            name: `Request link ${chat} for ${String(user.wallet).slice(0, 6)}…`,
-            member_limit: 1,
+            name: `Request link ${chat} for ${tgId}`,
+            expire_date,
             creates_join_request: true,
         });
 
