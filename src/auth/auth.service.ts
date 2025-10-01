@@ -12,11 +12,16 @@ export class AuthService {
   ) { }
 
   public async getUser(tgId: bigint) {
-    return this.prisma.user.upsert({
+    const user = await  this.prisma.user.upsert({
       where: { tgId },
       update: {},
       create: { tgId },
     });
+
+    return {
+      tgId: user.tgId.toString(),
+      wallet: user.wallet
+    }
   }
 
   public async connect(tgId: bigint, data: any) {
