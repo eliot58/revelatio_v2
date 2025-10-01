@@ -299,14 +299,12 @@
             sectionAuth.style.display = 'grid';
             const connected = !!wallet;
 
-            // форматируем "красиво"
             const pretty = connected ? formatTonAddress(wallet, {
-                bounceable: true,   // обычно true для отображения
-                urlSafe: true,      // удобная base64url форма
-                testOnly: false     // вы же на mainnet — оставьте false
+                bounceable: true,
+                urlSafe: true,
+                testOnly: false
             }) : '';
 
-            // компактный вариант в подсказке
             authHint.textContent = connected
                 ? `Wallet linked: ${shortAddr(pretty)}`
                 : 'No wallet linked';
@@ -373,7 +371,6 @@
             try {
                 const resp = await apiGetUser();
 
-                console.log(resp)
                 showAuth(resp?.wallet ?? null);
             } catch {
                 showAuth(null);
@@ -399,7 +396,7 @@
             setLink(''); // очистим предыдущую
             try {
                 const r = await apiOneTimeLink(kind);
-                const url = r?.data?.url ?? '';
+                const url = r?.invite_link ?? '';
                 if (url) setLink(url);
             } finally {
                 btn.disabled = false;
