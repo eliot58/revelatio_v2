@@ -201,6 +201,7 @@
             const body = {
                 address: account.address,
                 network: account.chain,
+                public_key: account.publicKey,
                 proof: { ...proof, state_init: account.walletStateInit }
             };
             const res = await fetch(`${API_HOST}/auth/connect`, {

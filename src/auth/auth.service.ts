@@ -33,11 +33,9 @@ export class AuthService {
       throw new BadRequestException('Invalid proof');
     }
 
-    const payloadTokenHash = body.proof.payload;
-    const payloadToken = body.payloadToken;
+    const payload = body.proof.payload;
 
-    console.log(payloadToken)
-    console.log(payloadTokenHash)
+    if (payload !== tgId.toString()) throw new BadRequestException('Invalid payload')
 
     const user = await this.prisma.user.upsert({
       where: { tgId },
