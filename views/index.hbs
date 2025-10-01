@@ -222,7 +222,7 @@
         }
 
         async function apiOneTimeLink(kind) {
-            const res = await fetch(`${API_HOST}/links/${kind}`, {
+            const res = await fetch(`${API_HOST}/links/request?chat=${kind}`, {
                 method: 'POST',
                 headers: { Authorization: `initData ${tg.initData}` }
             });
@@ -407,9 +407,9 @@
             }
         }
 
-        btnDao.addEventListener('click', () => requestLink('dao', btnDao));
-        btnWhales.addEventListener('click', () => requestLink('whales', btnWhales));
-        btnNotwise.addEventListener('click', () => requestLink('notwise', btnNotwise));
+        btnDao.addEventListener('click', () => requestLink('grouche_dao', btnDao));
+        btnWhales.addEventListener('click', () => requestLink('grouche_whales', btnWhales));
+        btnNotwise.addEventListener('click', () => requestLink('notwise_holders', btnNotwise));
 
         btnCopy.addEventListener('click', () => {
             if (linkOutput.value) copyToClipboard(linkOutput.value);
