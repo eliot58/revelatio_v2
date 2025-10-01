@@ -223,7 +223,6 @@
 
         async function apiOneTimeLink(kind) {
             const res = await fetch(`${API_HOST}/links/request?chat=${kind}`, {
-                method: 'POST',
                 headers: { Authorization: `initData ${tg.initData}` }
             });
             return res.json();
