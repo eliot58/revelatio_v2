@@ -386,6 +386,7 @@
         btnDisconnect.addEventListener('click', async () => {
             btnDisconnect.disabled = true;
             try {
+                await tonConnectUI.disconnect();
                 await apiDisconnect();
                 showAuth(null);
             } finally {
