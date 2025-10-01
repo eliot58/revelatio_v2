@@ -36,7 +36,9 @@ export class TelegramModule implements OnModuleInit {
     const secret = this.config.get<string>('TG_WEBHOOK_SECRET');
 
     await this.tgBot.api.setWebhook(`${url}${path}`, {
-      secret_token: secret
+      secret_token: secret,
+      allowed_updates: ['message', 'chat_join_request'],
+      drop_pending_updates: true,
     });
   }
 }
