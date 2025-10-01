@@ -375,9 +375,8 @@
                 const resp = await apiGetUser();
 
                 console.log(resp)
-                showAuth(resp?.data?.wallet ?? null);
+                showAuth(resp?.wallet ?? null);
             } catch {
-                console.log("resp error")
                 showAuth(null);
             }
         })();
