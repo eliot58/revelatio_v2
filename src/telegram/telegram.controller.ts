@@ -10,6 +10,7 @@ export class TelegramController {
     @HttpCode(200)
     async webhook(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
         console.log(" lkndnsljdklasjd klad js")
+        console.log(req.headers['x-telegram-bot-api-secret-token'])
         const expected = process.env.TG_WEBHOOK_SECRET;
         if (expected) {
             const got = req.headers['x-telegram-bot-api-secret-token'] as string | undefined;
