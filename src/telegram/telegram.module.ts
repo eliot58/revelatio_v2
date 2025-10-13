@@ -1,8 +1,9 @@
 import { Module, OnModuleInit, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigType } from '@nestjs/config';
 import { TelegramController } from './telegram.controller';
 import { TelegramService } from './telegram.service';
-import { PrismaModule } from 'src/prisma/prisma.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import appConfig from '../config/app.config';
 import { Bot } from 'grammy';
 
 @Module({
@@ -10,11 +11,11 @@ import { Bot } from 'grammy';
   providers: [
     {
       provide: 'TELEGRAM_BOT',
-      useFactory: (config: ConfigService) => {
-        const token = config.get<string>('BOT_TOKEN');
-        return new Bot(token!);
+      inject: [appConfig.KEY],
+      useFactory: (appCfg: ConfigType<typeof appConfig>) => {
+        const token = appCfg.bot_token;
+        return new Bot(token);
       },
-      inject: [ConfigService],
     },
     TelegramService,
   ],
@@ -24,16 +25,16 @@ import { Bot } from 'grammy';
 export class TelegramModule implements OnModuleInit {
   constructor(
     @Inject('TELEGRAM_BOT') private readonly tgBot: Bot,
-    private readonly telegramService: TelegramService, 
-    private readonly config: ConfigService,
+    @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
+    private readonly telegramService: TelegramService
   ) { }
 
   async onModuleInit() {
     this.telegramService.register(this.tgBot);
     
-    const url = this.config.get<string>('PUBLIC_URL');
-    const path = this.config.get<string>('TG_WEBHOOK_PATH');
-    const secret = this.config.get<string>('TG_WEBHOOK_SECRET');
+    const url = this.appCfg.public_url;
+    const path = this.appCfg.tg_webhook_path;
+    const secret = this.appCfg.tg_webhook_secret;
 
     await this.tgBot.api.setWebhook(`${url}${path}`, {
       secret_token: secret,

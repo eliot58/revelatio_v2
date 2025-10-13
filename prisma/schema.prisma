@@ -15,23 +15,21 @@ datasource db {
 }
 
 model User {
-  tgId   BigInt  @id
+  tgId   BigInt   @id
   wallet String?
-
-  memberships Member[]
 }
 
-model Member {
-  chat      Chat
+model Link {
+  id          Int     @id @default(autoincrement())
+  invite_link String  @unique
+  wallet      String
+  user_id     BigInt?
+  chat        Chat
+  expired_at  DateTime
+  created_at  DateTime @default(now())
 
-  userId    BigInt
-  user      User   @relation(fields: [userId], references: [tgId], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@id([userId, chat])
-  @@index([chat])
+  @@index([user_id])
+  @@unique([wallet, chat], name: "wallet_chat")
 }
 
 enum Chat {

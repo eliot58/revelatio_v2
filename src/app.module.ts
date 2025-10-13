@@ -9,12 +9,16 @@ import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { LinksModule } from './links/links.module';
+import appConfig from './config/app.config';
+import authConfig from './config/auth.config';
 
 @Module({
   imports: [
     SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      load: [appConfig, authConfig]
     }),
     ScheduleModule.forRoot(),
     AuthModule,

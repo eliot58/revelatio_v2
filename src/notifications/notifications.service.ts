@@ -1,9 +1,13 @@
 import { HttpService } from '@nestjs/axios';
 import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigType } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { Bot, InlineKeyboard } from 'grammy';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, last } from 'rxjs';
+import appConfig from '../config/app.config';
+import { RedisService } from 'src/redis/redis.service';
+import { Address } from '@ton/ton';
+import { TonApiClient } from '@ton-api/client';
 
 type GetgemsEventItem = {
     address: string;
@@ -20,14 +24,22 @@ type GetgemsEventItem = {
 export class NotificationsService {
     private readonly getgemsAuth: string;
 
-    constructor(
-        @Inject('TELEGRAM_BOT') private readonly bot: Bot,
-        private readonly http: HttpService,
-        private readonly config: ConfigService,
+    private handlers = [
+        this.handleNotWise.bind(this),
+        this.handleNotWiseOwlings.bind(this),
+        this.handleGrouchePears.bind(this),
+        this.handleNotWiseRoyalityViolation.bind(this),
+    ];
 
-    ) {
-        this.getgemsAuth = this.config.get<string>('GETGEMS_AUTH')!;
-    }
+    private currentHandler = 0;
+
+    constructor(
+        private readonly http: HttpService,
+        private readonly redis: RedisService,
+        @Inject('TELEGRAM_BOT') private readonly bot: Bot,
+        @Inject("TONAPI_CLIENT") private readonly tonClient: TonApiClient,
+        @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
+    ) { }
 
     private shortAddr(addr?: string, head = 2, tail = 4): string {
         if (!addr) return '';
@@ -38,9 +50,7 @@ export class NotificationsService {
     private marketappUserUrl(addr: string): string {
         return `https://getgems.io/user/${addr}`;
     }
-    private getgemsCollectionUrl(collection: string): string {
-        return `https://getgems.io/collection/${collection}`;
-    }
+
     private getgemsNftUrl(nftAddr: string): string {
         return `https://getgems.io/nft/${nftAddr}`;
     }
@@ -78,8 +88,17 @@ export class NotificationsService {
         };
     }
 
-    private async fetchEvents(collectionId: string, nowMs: number, types: string[]): Promise<GetgemsEventItem[]> {
+    private async fetchEvents(collectionId: string, types: string[]): Promise<GetgemsEventItem[]> {
         const base = `https://api.getgems.io/public-api/v1/collection/history/${collectionId}`;
+
+        let nowMs: number;
+
+        const cache = await this.redis.getKey(`nowMs:${collectionId}`)
+        if (!cache) {
+            nowMs = new Date().getTime();
+        } else {
+            nowMs = Number(cache)
+        }
 
         const params = {
             minTime: String(nowMs),
@@ -95,16 +114,16 @@ export class NotificationsService {
         if (items.length > 0) {
             const first = items[0];
             const ts = Date.parse(first.time);
-            if (!Number.isNaN(ts)) {
-                nowMs = ts + 1;
-            }
+            nowMs = ts + 1;
         }
+
+        await this.redis.setKey(`nowMs:${collectionId}`, nowMs.toString())
 
         return items;
     }
 
     // ----------------- SENDER -----------------
-    private async sendNotification(item: GetgemsEventItem, chatIds: number[]) {
+    private async sendNotification(item: GetgemsEventItem, chatIds: string[]) {
         const nft = await this.fetchNftDetails(item.address);
 
         const kb = new InlineKeyboard().url(
@@ -146,28 +165,106 @@ export class NotificationsService {
         }
     }
 
-    @Interval(60000)
-    handleNotWise() {
+    @Interval(120000)
+    async handleSequential() {
+        const handler = this.handlers[this.currentHandler];
+        try {
+            await handler();
+        } catch (err) {
+            console.error('Error in notification handler:', err);
+        }
 
+        this.currentHandler = (this.currentHandler + 1) % this.handlers.length;
+    }
+
+    // ----------------- HANDLERS -----------------
+    private async handleNotWise() {
+        const events = await this.fetchEvents("EQA5HalN4asamSjufbmXF_Wr3jyapCEYcYN0igfBDe5Nmbm7", ["sold", "putUpForAuction"])
+
+        for (const event of events) {
+            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+        }
+    }
+
+    private async handleNotWiseOwlings() {
+        const events = await this.fetchEvents("EQAPpJOA7BJPDJw9d7Oy7roElafFzsIkjaPoKPe9nmNBKaOZ", ["sold", "putUpForAuction"])
+
+        for (const event of events) {
+            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+        }
+    }
+
+    private async handleGrouchePears() {
+        const events = await this.fetchEvents("EQCdpND6kJ8O7KFfHfIiqY75MBuFkpX2jdBrRDnlFGpp97QQ", ["sold", "putUpForAuction"])
+
+        for (const event of events) {
+            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+        }
+    }
+
+    private async handleNotWiseRoyalityViolation() {
+        console.log('Running handleNotWiseRoyalityViolation...');
+    }
+
+    private async sendSwapNotification(
+        amount: bigint,
+        grcOut: bigint,
+        price: bigint,
+        txHash: string,
+    ): Promise<void> {
+        const txLink = `https://tonviewer.com/transaction/${txHash}`;
+
+        const message =
+            `🟢 GRC <a href="${txLink}">Purchase</a> (STON.fi)\n` +
+            `<b>${amount} 💎</b> → <b>${grcOut} 🍐</b>\n` +
+            `Price: <b>${price} 💎</b>`;
+
+        const chatId = this.appCfg.chat_id_grouche_dao;
+
+        await this.bot.api.sendMessage(chatId, message, {
+            parse_mode: 'HTML'
+        });
     }
 
     @Interval(60000)
-    handleNotWiseOwlings() {
+    async handleJettonPool() {
+        const poolAddrStr = 'EQAdn2BoPvqOZ6ptXBXpoZ8pXhJMR0KQMxZuEcK-6J_oO5Vs';
+        const address = Address.parse(poolAddrStr);
 
+        const cache = await this.redis.getKey(`lastLt:${poolAddrStr}`);
+        let lastLt: bigint | undefined = undefined;
+        if (cache) lastLt = BigInt(cache);
+
+        const res = await this.tonClient.blockchain.getBlockchainAccountTransactions(address, { limit: 50, after_lt: lastLt });
+
+        for (const tx of res.transactions) {
+            // если транзакция не успешна — пропускаем
+            if (!tx.success) continue;
+
+            // если нет decodedOpName или не тот тип — пропускаем
+            if (tx.inMsg?.decodedOpName !== 'stonfi_swap') continue;
+
+            // проверяем, что есть outMsgs и он не пустой
+            if (!Array.isArray(tx.outMsgs) || tx.outMsgs.length === 0) continue;
+
+            // последний элемент:
+            const lastOut = tx.outMsgs[tx.outMsgs.length - 1];
+
+            // безопасная проверка decodedOpName у последнего сообщения
+            if (lastOut?.decodedOpName !== 'stonfi_payment_request') continue;
+
+            // безопасный доступ к полям (optional chaining)
+            const amount0OutStr = lastOut.decodedBody["params"]["value"]["amount0_out"];
+            if (!amount0OutStr) continue;
+
+            // пример парсинга и использования
+            const txHash = tx.hash;
+            const tonIn = BigInt(tx.inMsg.decodedBody["jetton_amount"]);
+            const grcOut = BigInt(amount0OutStr);
+            const price = tonIn / grcOut;
+
+
+        }
     }
 
-    @Interval(60000)
-    handleGrouchePears() {
-
-    }
-
-    @Interval(60000)
-    handleGroucheJetton() {
-
-    }
-
-    @Interval(60000)
-    handleNotWiseRoyalityViolation() {
-
-    }
 }

@@ -1,14 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TonProofService } from '../services/ton-proof-service';
 import { CheckProofRequest } from './dto/check-proof-dto';
-import { TonApiService } from '../services/ton-api-service';
 import { ApiResponse } from './dto/api-response';
+import { TonService } from '../ton/ton.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly ton: TonService
   ) { }
 
   public async getUser(tgId: bigint) {
@@ -28,12 +28,7 @@ export class AuthService {
     const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
     const body = CheckProofRequest.parse(parsedData);
 
-    const client = TonApiService.create(body.network);
-    const service = new TonProofService();
-
-    const isValidProof = await service.checkProof(body, (address) =>
-      client.getWalletPublicKey(address),
-    );
+    const isValidProof = await this.ton.checkProof(body);
     if (!isValidProof) {
       throw new BadRequestException('Invalid proof');
     }
