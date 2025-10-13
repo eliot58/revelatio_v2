@@ -239,12 +239,12 @@ export class NotificationsService {
 
             if (!Array.isArray(tx.outMsgs) || tx.outMsgs.length === 0) continue;
 
-            const lastOut = tx.outMsgs[tx.outMsgs.length - 1];
+            const lastOut = tx.outMsgs[0];
 
             if (lastOut?.decodedOpName !== 'stonfi_payment_request') continue;
 
             const amount0OutStr = lastOut.decodedBody["params"]["value"]["amount0_out"];
-            if (!amount0OutStr) continue;
+            if (amount0OutStr === "0") continue;
 
             const txHash = tx.hash;
             const tonIn = Number(tx.inMsg.decodedBody["jetton_amount"]);
