@@ -174,7 +174,7 @@ export class NotificationsService {
         const events = await this.fetchEvents("EQA5HalN4asamSjufbmXF_Wr3jyapCEYcYN0igfBDe5Nmbm7", "&types=sold&types=putUpForAuction")
 
         for (const event of events) {
-            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+            await this.sendNotification(event, ["-1002234423310", "-1001338790838"])
         }
     }
 
@@ -184,7 +184,7 @@ export class NotificationsService {
         console.log(events)
 
         for (const event of events) {
-            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+            await this.sendNotification(event, ["-1002234423310", "-1001338790838"])
         }
     }
 
@@ -192,7 +192,7 @@ export class NotificationsService {
         const events = await this.fetchEvents("EQCdpND6kJ8O7KFfHfIiqY75MBuFkpX2jdBrRDnlFGpp97QQ", "&types=sold&types=putUpForAuction")
 
         for (const event of events) {
-            await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
+            await this.sendNotification(event, ["-1003007629863"])
         }
     }
 
@@ -213,9 +213,7 @@ export class NotificationsService {
             `<b>${tonIn} 💎</b> → <b>${grcOut} 🍐</b>\n` +
             `Price: <b>${price} 💎</b>`;
 
-        const chatId = this.appCfg.chat_id_grouche_dao;
-
-        await this.bot.api.sendMessage(chatId, message, {
+        await this.bot.api.sendMessage(-1003007629863, message, {
             parse_mode: 'HTML',
             link_preview_options: {
                 is_disabled: true
