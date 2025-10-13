@@ -11,6 +11,7 @@ export default registerAs('app', () => ({
     chat_id_grouche_dao: process.env.CHAT_ID_GROUCHE_DAO!,
     chat_id_grouche_whales: process.env.CHAT_ID_GROUCHE_WHALES!,
     chat_id_notwise_holders: process.env.CHAT_ID_NOTWISE_HOLDERS!,
+    chat_id_notwise: process.env.CHAT_ID_NOTWISE!,
     chat_id_map: {
         "grouche_whales": process.env.CHAT_ID_GROUCHE_WHALES!,
         "grouche_dao": process.env.CHAT_ID_GROUCHE_DAO!,

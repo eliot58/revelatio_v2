@@ -5,7 +5,7 @@ import { Interval } from '@nestjs/schedule';
 import { Bot, InlineKeyboard } from 'grammy';
 import { firstValueFrom } from 'rxjs';
 import appConfig from '../config/app.config';
-import { RedisService } from 'src/redis/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { Address } from '@ton/ton';
 import { TonApiClient } from '@ton-api/client';
 
@@ -234,6 +234,8 @@ export class NotificationsService {
 
         const res = await this.tonClient.blockchain.getBlockchainAccountTransactions(address, { limit: 50, after_lt: lastLt });
 
+        if (res.transactions.length === 0) return;
+        
         const firstLt = res.transactions[0].lt.toString()
 
         if (!cache) {
