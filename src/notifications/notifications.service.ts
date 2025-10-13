@@ -157,7 +157,7 @@ export class NotificationsService {
         }
     }
 
-    @Interval(120000)
+    @Interval(60000)
     async handleSequential() {
         const handler = this.handlers[this.currentHandler];
         try {
@@ -180,6 +180,8 @@ export class NotificationsService {
 
     private async handleNotWiseOwlings() {
         const events = await this.fetchEvents("EQAPpJOA7BJPDJw9d7Oy7roElafFzsIkjaPoKPe9nmNBKaOZ", "&types=sold&types=putUpForAuction")
+
+        console.log(events)
 
         for (const event of events) {
             await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
