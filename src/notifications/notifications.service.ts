@@ -181,8 +181,6 @@ export class NotificationsService {
     private async handleNotWiseOwlings() {
         const events = await this.fetchEvents("EQAPpJOA7BJPDJw9d7Oy7roElafFzsIkjaPoKPe9nmNBKaOZ", "&types=sold&types=putUpForAuction")
 
-        console.log(events)
-
         for (const event of events) {
             await this.sendNotification(event, ["-1002234423310", "-1001338790838"])
         }
