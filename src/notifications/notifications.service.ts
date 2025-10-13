@@ -22,8 +22,6 @@ type GetgemsEventItem = {
 
 @Injectable()
 export class NotificationsService {
-    private readonly getgemsAuth: string;
-
     private handlers = [
         this.handleNotWise.bind(this),
         this.handleNotWiseOwlings.bind(this),
@@ -70,7 +68,7 @@ export class NotificationsService {
 
     private headers() {
         const headers: Record<string, string> = { accept: 'application/json' };
-        if (this.getgemsAuth) headers['Authorization'] = this.getgemsAuth;
+        headers['Authorization'] = this.appCfg.getgems_auth;
         return headers;
     }
 
@@ -207,7 +205,7 @@ export class NotificationsService {
     }
 
     private async sendSwapNotification(
-        amount: bigint,
+        tonIn: bigint,
         grcOut: bigint,
         price: bigint,
         txHash: string,
@@ -216,7 +214,7 @@ export class NotificationsService {
 
         const message =
             `🟢 GRC <a href="${txLink}">Purchase</a> (STON.fi)\n` +
-            `<b>${amount} 💎</b> → <b>${grcOut} 🍐</b>\n` +
+            `<b>${tonIn} 💎</b> → <b>${grcOut} 🍐</b>\n` +
             `Price: <b>${price} 💎</b>`;
 
         const chatId = this.appCfg.chat_id_grouche_dao;
@@ -263,7 +261,7 @@ export class NotificationsService {
             const grcOut = BigInt(amount0OutStr);
             const price = tonIn / grcOut;
 
-
+            await this.sendSwapNotification(tonIn, grcOut, price, txHash);
         }
     }
 
