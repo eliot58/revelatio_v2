@@ -86,9 +86,7 @@ export class NotificationsService {
         };
     }
 
-    private async fetchEvents(collectionId: string, types: string[]): Promise<GetgemsEventItem[]> {
-        const base = `https://api.getgems.io/public-api/v1/collection/history/${collectionId}`;
-
+    private async fetchEvents(collectionId: string, types: string): Promise<GetgemsEventItem[]> {
         let nowMs: number;
 
         const cache = await this.redis.getKey(`nowMs:${collectionId}`)
@@ -98,14 +96,10 @@ export class NotificationsService {
             nowMs = Number(cache)
         }
 
-        const params = {
-            minTime: String(nowMs),
-            limit: "100",
-            types: types,
-        };
+        const url = `https://api.getgems.io/public-api/v1/collection/history/${collectionId}?minTime=${nowMs}&limit=100${types}`;
 
         const { data } = await firstValueFrom(
-            this.http.get(base, { params, headers: this.headers() }),
+            this.http.get(url, { headers: this.headers() }),
         );
 
         const items = (data?.response?.items ?? []) as GetgemsEventItem[];
@@ -177,7 +171,7 @@ export class NotificationsService {
 
     // ----------------- HANDLERS -----------------
     private async handleNotWise() {
-        const events = await this.fetchEvents("EQA5HalN4asamSjufbmXF_Wr3jyapCEYcYN0igfBDe5Nmbm7", ["sold", "putUpForAuction"])
+        const events = await this.fetchEvents("EQA5HalN4asamSjufbmXF_Wr3jyapCEYcYN0igfBDe5Nmbm7", "&types=sold&types=putUpForAuction")
 
         for (const event of events) {
             await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
@@ -185,7 +179,7 @@ export class NotificationsService {
     }
 
     private async handleNotWiseOwlings() {
-        const events = await this.fetchEvents("EQAPpJOA7BJPDJw9d7Oy7roElafFzsIkjaPoKPe9nmNBKaOZ", ["sold", "putUpForAuction"])
+        const events = await this.fetchEvents("EQAPpJOA7BJPDJw9d7Oy7roElafFzsIkjaPoKPe9nmNBKaOZ", "&types=sold&types=putUpForAuction")
 
         for (const event of events) {
             await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
@@ -193,7 +187,7 @@ export class NotificationsService {
     }
 
     private async handleGrouchePears() {
-        const events = await this.fetchEvents("EQCdpND6kJ8O7KFfHfIiqY75MBuFkpX2jdBrRDnlFGpp97QQ", ["sold", "putUpForAuction"])
+        const events = await this.fetchEvents("EQCdpND6kJ8O7KFfHfIiqY75MBuFkpX2jdBrRDnlFGpp97QQ", "&types=sold&types=putUpForAuction")
 
         for (const event of events) {
             await this.sendNotification(event, [this.appCfg.chat_id_grouche_dao])
