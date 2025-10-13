@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { Bot, InlineKeyboard } from 'grammy';
-import { firstValueFrom, last } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import appConfig from '../config/app.config';
 import { RedisService } from 'src/redis/redis.service';
 import { Address } from '@ton/ton';
@@ -152,7 +152,7 @@ export class NotificationsService {
             await this.bot.api.sendPhoto(chatId, nft.image ?? this.getgemsNftUrl(item.address), {
                 caption,
                 parse_mode: 'HTML',
-                reply_markup: kb,
+                reply_markup: kb
             });
         }
     }
@@ -199,9 +199,9 @@ export class NotificationsService {
     }
 
     private async sendSwapNotification(
-        tonIn: bigint,
-        grcOut: bigint,
-        price: bigint,
+        tonIn: string,
+        grcOut: string,
+        price: string,
         txHash: string,
     ): Promise<void> {
         const txLink = `https://tonviewer.com/transaction/${txHash}`;
@@ -214,7 +214,10 @@ export class NotificationsService {
         const chatId = this.appCfg.chat_id_grouche_dao;
 
         await this.bot.api.sendMessage(chatId, message, {
-            parse_mode: 'HTML'
+            parse_mode: 'HTML',
+            link_preview_options: {
+                is_disabled: true
+            }
         });
     }
 
@@ -229,33 +232,39 @@ export class NotificationsService {
 
         const res = await this.tonClient.blockchain.getBlockchainAccountTransactions(address, { limit: 50, after_lt: lastLt });
 
-        for (const tx of res.transactions) {
-            // если транзакция не успешна — пропускаем
+        for (const tx of res.transactions.reverse()) {
             if (!tx.success) continue;
 
-            // если нет decodedOpName или не тот тип — пропускаем
             if (tx.inMsg?.decodedOpName !== 'stonfi_swap') continue;
 
-            // проверяем, что есть outMsgs и он не пустой
             if (!Array.isArray(tx.outMsgs) || tx.outMsgs.length === 0) continue;
 
-            // последний элемент:
             const lastOut = tx.outMsgs[tx.outMsgs.length - 1];
 
-            // безопасная проверка decodedOpName у последнего сообщения
             if (lastOut?.decodedOpName !== 'stonfi_payment_request') continue;
 
-            // безопасный доступ к полям (optional chaining)
             const amount0OutStr = lastOut.decodedBody["params"]["value"]["amount0_out"];
             if (!amount0OutStr) continue;
 
-            // пример парсинга и использования
             const txHash = tx.hash;
-            const tonIn = BigInt(tx.inMsg.decodedBody["jetton_amount"]);
-            const grcOut = BigInt(amount0OutStr);
+            const tonIn = Number(tx.inMsg.decodedBody["jetton_amount"]);
+            const grcOut = Number(amount0OutStr);
             const price = tonIn / grcOut;
 
-            await this.sendSwapNotification(tonIn, grcOut, price, txHash);
+            const tonStr = (tonIn / 1e9).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            const grcStr = (grcOut / 1e9).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            const priceStr = Number(price).toLocaleString(undefined, {
+                minimumFractionDigits: 6,
+                maximumFractionDigits: 6,
+            });
+
+            await this.sendSwapNotification(tonStr, grcStr, priceStr, txHash);
         }
     }
 
