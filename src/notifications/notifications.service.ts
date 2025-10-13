@@ -221,7 +221,7 @@ export class NotificationsService {
         });
     }
 
-    @Interval(60000)
+    @Interval(180000)
     async handleJettonPool() {
         const poolAddrStr = 'EQAdn2BoPvqOZ6ptXBXpoZ8pXhJMR0KQMxZuEcK-6J_oO5Vs';
         const address = Address.parse(poolAddrStr);
@@ -232,6 +232,13 @@ export class NotificationsService {
 
         const res = await this.tonClient.blockchain.getBlockchainAccountTransactions(address, { limit: 50, after_lt: lastLt });
 
+        const firstLt = res.transactions[0].lt.toString()
+
+        if (!cache) {
+            await this.redis.setKey(`lastLt:${poolAddrStr}`, firstLt);
+            return;
+        }
+
         for (const tx of res.transactions.reverse()) {
             if (!tx.success) continue;
 
@@ -239,12 +246,12 @@ export class NotificationsService {
 
             if (!Array.isArray(tx.outMsgs) || tx.outMsgs.length === 0) continue;
 
-            const lastOut = tx.outMsgs[0];
+            const lastOut = tx.outMsgs[tx.outMsgs.length - 1];
 
             if (lastOut?.decodedOpName !== 'stonfi_payment_request') continue;
 
             const amount0OutStr = lastOut.decodedBody["params"]["value"]["amount0_out"];
-            if (amount0OutStr === "0") continue;
+            if (amount0OutStr === '0') continue;
 
             const txHash = tx.hash;
             const tonIn = Number(tx.inMsg.decodedBody["jetton_amount"]);
@@ -266,6 +273,8 @@ export class NotificationsService {
 
             await this.sendSwapNotification(tonStr, grcStr, priceStr, txHash);
         }
+
+        await this.redis.setKey(`lastLt:${poolAddrStr}`, firstLt);
     }
 
 }
