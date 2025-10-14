@@ -258,6 +258,8 @@ export class NotificationsService {
             const grcOut = Number(amount0OutStr);
             const price = tonIn / grcOut;
 
+            if (100000000000 > tonIn) continue;
+
             const tonStr = (tonIn / 1e9).toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
