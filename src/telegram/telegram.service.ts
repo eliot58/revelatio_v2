@@ -13,11 +13,19 @@ export class TelegramService {
     ) { }
 
     register(bot: Bot) {
-        bot.command('start', async (ctx) => {
-            const firstName = ctx.from?.first_name || 'there';
-            await ctx.reply(
-                `Hello, ${firstName}! 👋\n\nWelcome to our bot. I’m here to help you.`
-            );
+        bot.command('test_invite', async (ctx) => {
+            await ctx.reply('Открыть Web App:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: 'Open Web App',
+                                web_app: { url: 'https://revapi.masonsplay.com/' },
+                            },
+                        ],
+                    ],
+                },
+            });
         });
 
         bot.on('chat_join_request', async (ctx) => {
@@ -45,33 +53,21 @@ export class TelegramService {
             });
         });
 
-        bot.on('message:new_chat_members', (ctx) => {
-            ctx.message.new_chat_members.forEach(async (member) => {
-                await ctx.reply(
-                    `User ${member.id} joined chat ${ctx.chat.id}`
-                );
-            });
-        });
-
         bot.on('message:left_chat_member', async (ctx) => {
             const chatId = ctx.chat.id;
             const left = ctx.message.left_chat_member;
             const leftUserId = left?.id;
             if (!leftUserId) return;
 
-            // Пытаемся найти enum Chat по appCfg.chat_id_map (reverse lookup)
             const map = this.appCfg.chat_id_map ?? {};
             const pair = Object.entries(map).find(([key, id]) => {
-                // chat_id в config может быть строкой или числом
                 return Number(id) === Number(chatId);
             });
 
             if (pair && pair[0]) {
                 const chatEnumKey = pair[0] as keyof typeof Chat;
-                // Prisma хранит enum как string, поэтому используем ключ напрямую
                 const chatValue = chatEnumKey as unknown as Chat;
 
-                // Находим запись, где user_id = leftUserId и chat = chatValue
                 const link = await this.prisma.link.findFirst({
                     where: {
                         user_id: BigInt(leftUserId),
