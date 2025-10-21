@@ -4,10 +4,14 @@ import { TelegramController } from './telegram.controller';
 import { TelegramService } from './telegram.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import appConfig from '../config/app.config';
+import { TonModule } from '../ton/ton.module';
 import { Bot } from 'grammy';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [
+    PrismaModule,
+    TonModule.forRootAsync()
+  ],
   providers: [
     {
       provide: 'TELEGRAM_BOT',

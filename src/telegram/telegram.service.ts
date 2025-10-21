@@ -4,17 +4,23 @@ import appConfig from '../config/app.config';
 import { ConfigType } from '@nestjs/config';
 import { Chat } from '../../generated/prisma';
 import { Bot } from 'grammy';
+import { Address } from '@ton/core';
+import { TonApiClient } from '@ton-api/client';
+import { ContractAdapter } from '@ton-api/ton-adapter';
+import { mnemonicToPrivateKey } from '@ton/crypto';
+import { SendMode, WalletContractV4, beginCell, internal, toNano } from '@ton/ton';
 
 @Injectable()
 export class TelegramService {
     constructor(
         @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
+        @Inject("TESTNET_TONAPI_CLIENT") private readonly tonClient: TonApiClient,
         private readonly prisma: PrismaService
     ) { }
 
     register(bot: Bot) {
         bot.command('test_invite', async (ctx) => {
-            await ctx.reply('Открыть Web App:', {
+            await ctx.reply('Open Web App:', {
                 reply_markup: {
                     inline_keyboard: [
                         [
@@ -25,6 +31,27 @@ export class TelegramService {
                         ],
                     ],
                 },
+            });
+        });
+
+        bot.command('get', async (ctx) => {
+            await ctx.reply('Please send your test TON wallet address:');
+            bot.on('message:text', async (ctx2) => {
+                const wallet = ctx2.message.text.trim();
+
+                try {
+                    Address.parse(wallet);
+                } catch {
+                    await ctx2.reply('❌ Invalid TON address. Please try again.');
+                    return;
+                }
+
+                try {
+                    await this.sendJettons(wallet)
+                    await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
+                } catch (err) {
+                    await ctx2.reply('❌ Error occurred while sending jettons');
+                }
             });
         });
 
@@ -84,7 +111,48 @@ export class TelegramService {
                     return;
                 }
             }
-
         });
+    }
+
+    async sendJettons(destination: string) {
+        const adapter = new ContractAdapter(this.tonClient);
+
+        const keyPair = await mnemonicToPrivateKey(this.appCfg.seed_phrase);
+
+        const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
+        const contract = adapter.open(wallet);
+
+        const jettons = this.appCfg.jetton_wallets;
+
+        for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
+            const jettonWallet = Address.parse(jettonWalletBase64);
+
+            const jettonTransferPayload = beginCell()
+            .storeUint(0xf8a7ea5, 32)
+            .storeUint(0, 64) 
+            .storeCoins(10000 * (symbol === 'usdt' ? 1e6 : 1e9))
+            .storeAddress(Address.parse(destination))
+            .storeAddress(wallet.address)
+            .storeBit(false)
+            .storeCoins(1n)
+            .storeMaybeRef(undefined)
+            .endCell();
+
+        const seqno = await contract.getSeqno();
+
+        await contract.sendTransfer({
+            seqno,
+            secretKey: keyPair.secretKey,
+            sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+            messages: [
+                internal({
+                    to: jettonWallet,
+                    value: toNano(0.05),
+                    body: jettonTransferPayload
+                })
+            ]
+        });
+
+        }
     }
 }
