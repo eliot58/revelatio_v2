@@ -5,11 +5,13 @@ import { TelegramService } from './telegram.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import appConfig from '../config/app.config';
 import { TonModule } from '../ton/ton.module';
+import { RedisModule } from '../redis/redis.module';
 import { Bot } from 'grammy';
 
 @Module({
   imports: [
     PrismaModule,
+    RedisModule,
     TonModule.forRootAsync()
   ],
   providers: [

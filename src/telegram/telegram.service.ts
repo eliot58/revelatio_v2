@@ -9,13 +9,15 @@ import { TonApiClient } from '@ton-api/client';
 import { ContractAdapter } from '@ton-api/ton-adapter';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import { SendMode, WalletContractV5R1, beginCell, internal, toNano } from '@ton/ton';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class TelegramService {
     constructor(
         @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
         @Inject("TESTNET_TONAPI_CLIENT") private readonly tonClient: TonApiClient,
-        private readonly prisma: PrismaService
+        private readonly prisma: PrismaService,
+        private readonly redis: RedisService
     ) { }
 
     register(bot: Bot) {
@@ -48,7 +50,16 @@ export class TelegramService {
                 const wallet = ctx2.message.text.trim();
 
                 try {
-                    Address.parse(wallet);
+                    const address = Address.parse(wallet);
+
+                    const cache = await this.redis.getKey(`get:${address.toRawString()}`)
+
+                    if (cache) {
+                        await ctx2.reply('Please try again after 20 minute.');
+                        return;
+                    }
+
+                    await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
                 } catch {
                     await ctx2.reply('❌ Invalid TON address. Please try again.');
                     return;
@@ -127,8 +138,6 @@ export class TelegramService {
         const contract = adapter.open(wallet);
 
         const jettons = this.appCfg.jetton_wallets;
-
-        console.log(wallet.address.toRawString())
 
         for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
             const jettonWallet = Address.parse(jettonWalletBase64);
