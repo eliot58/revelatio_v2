@@ -11,12 +11,14 @@ export class TonModule {
             providers: [
                 {
                     provide: "TONAPI_CLIENT",
+                    inject: [appConfig.KEY],
                     useFactory: (cfg: ConfigType<typeof appConfig>) => {
                         return new TonApiClient({ apiKey: cfg.tonapi_key, baseUrl: cfg.tonapi_url });
                     },
                 },
                 {
                     provide: "TESTNET_TONAPI_CLIENT",
+                    inject: [appConfig.KEY],
                     useFactory: (cfg: ConfigType<typeof appConfig>) => {
                         return new TonApiClient({ apiKey: cfg.tonapi_key, baseUrl: cfg.testnet_tonapi_url });
                     },
