@@ -118,6 +118,8 @@ export class TelegramService {
         const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
         const contract = adapter.open(wallet);
 
+        console.log(wallet.address.toRawString())
+
         const jettons = this.appCfg.jetton_wallets;
 
         for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
