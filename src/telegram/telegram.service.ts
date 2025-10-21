@@ -123,10 +123,12 @@ export class TelegramService {
         for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
             const jettonWallet = Address.parse(jettonWalletBase64);
 
+            const amount = 10000n * (symbol === 'usdt' ? 1_000_000n : 1_000_000_000n);
+
             const jettonTransferPayload = beginCell()
             .storeUint(0xf8a7ea5, 32)
             .storeUint(0, 64) 
-            .storeCoins(10000 * (symbol === 'usdt' ? 1e6 : 1e9))
+            .storeCoins(amount)
             .storeAddress(Address.parse(destination))
             .storeAddress(wallet.address)
             .storeBit(false)
