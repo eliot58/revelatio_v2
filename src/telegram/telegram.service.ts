@@ -46,12 +46,8 @@ export class TelegramService {
                     return;
                 }
 
-                try {
-                    await this.sendJettons(wallet)
-                    await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
-                } catch (err) {
-                    await ctx2.reply('❌ Error occurred while sending jettons');
-                }
+                await this.sendJettons(wallet)
+                await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
             });
         });
 
