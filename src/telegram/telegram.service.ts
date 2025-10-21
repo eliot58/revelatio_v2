@@ -120,6 +120,8 @@ export class TelegramService {
 
         const jettons = this.appCfg.jetton_wallets;
 
+        console.log(wallet.address.toRawString())
+
         for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
             const jettonWallet = Address.parse(jettonWalletBase64);
 
