@@ -134,7 +134,7 @@ export class TelegramService {
 
         const keyPair = await mnemonicToPrivateKey(this.appCfg.seed_phrase);
 
-        const wallet = WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey });
+        const wallet = WalletContractV5R1.create({ publicKey: keyPair.publicKey, walletId: { networkGlobalId: -3 }});
         const contract = adapter.open(wallet);
 
         console.log(wallet.address.toRawString())
