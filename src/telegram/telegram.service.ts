@@ -50,16 +50,16 @@ export class TelegramService {
                 const wallet = ctx2.message.text.trim();
 
                 try {
-                    const address = Address.parse(wallet);
+                    Address.parse(wallet);
 
-                    const cache = await this.redis.getKey(`get:${address.toRawString()}`)
+                    // const cache = await this.redis.getKey(`get:${address.toRawString()}`)
 
-                    if (cache) {
-                        await ctx2.reply('Please try again after 20 minute.');
-                        return;
-                    }
+                    // if (cache) {
+                    //     await ctx2.reply('Please try again after 20 minute.');
+                    //     return;
+                    // }
 
-                    await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
+                    // await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
                 } catch {
                     await ctx2.reply('❌ Invalid TON address. Please try again.');
                     return;
