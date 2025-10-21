@@ -8,7 +8,7 @@ import { Address } from '@ton/core';
 import { TonApiClient } from '@ton-api/client';
 import { ContractAdapter } from '@ton-api/ton-adapter';
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { SendMode, WalletContractV4, beginCell, internal, toNano } from '@ton/ton';
+import { SendMode, WalletContractV5R1, beginCell, internal, toNano } from '@ton/ton';
 
 @Injectable()
 export class TelegramService {
@@ -115,10 +115,8 @@ export class TelegramService {
 
         const keyPair = await mnemonicToPrivateKey(this.appCfg.seed_phrase);
 
-        const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
+        const wallet = WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey });
         const contract = adapter.open(wallet);
-
-        console.log(wallet.address.toRawString())
 
         const jettons = this.appCfg.jetton_wallets;
 
