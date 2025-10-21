@@ -35,8 +35,16 @@ export class TelegramService {
         });
 
         bot.command('get', async (ctx) => {
+            if (ctx.chat.type !== 'private') {
+                return;
+            }
+
             await ctx.reply('Please send your test TON wallet address:');
             bot.on('message:text', async (ctx2) => {
+                if (ctx2.chat.type !== 'private') {
+                    return;
+                }
+
                 const wallet = ctx2.message.text.trim();
 
                 try {
