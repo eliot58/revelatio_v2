@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import appConfig from '../config/app.config';
 import { ConfigType } from '@nestjs/config';
@@ -6,22 +6,22 @@ import { Chat } from '../../generated/prisma';
 import { Bot } from 'grammy';
 import { Address } from '@ton/core';
 import { RedisService } from '../redis/redis.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { TonApiClient } from '@ton-api/client';
+import { ContractAdapter } from '@ton-api/ton-adapter';
+import { HighloadWalletV3 } from '../wrappers/highload-v3';
+import { mnemonicToWalletKey } from "@ton/crypto";
+import { OutActionSendMsg, SendMode, beginCell, internal, toNano } from '@ton/ton';
+import { HighloadQueryId } from '../wrappers/highload-query';
+import { randomInt } from 'crypto';
 
 @Injectable()
-export class TelegramService implements OnModuleInit {
+export class TelegramService {
     constructor(
         @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
-        @InjectQueue('telegram') private readonly telegramQueue: Queue,
+        @Inject("TESTNET_TONAPI_CLIENT") private readonly tonClient: TonApiClient,
         private readonly prisma: PrismaService,
         private readonly redis: RedisService
     ) { }
-
-    async onModuleInit() {
-        await this.telegramQueue.setGlobalConcurrency(1);
-    }
-
 
     register(bot: Bot) {
         bot.command('test_invite', async (ctx) => {
@@ -68,17 +68,9 @@ export class TelegramService implements OnModuleInit {
                     return;
                 }
 
-                const jettons = this.appCfg.jetton_wallets;
+                await this.sendJettons(wallet);
 
-                for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
-                    await this.telegramQueue.add('send_jetton', {
-                        destination: wallet,
-                        coins: symbol,
-                        jettonWallet: jettonWalletBase64
-                    }, { delay: 20000 },);
-                }
-
-                await ctx2.reply('✅ Jetton transfers have been added to the queue. Please wait for processing.');
+                await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
             });
         });
 
@@ -140,4 +132,100 @@ export class TelegramService implements OnModuleInit {
             }
         });
     }
+
+    async sendJettons(destination: string) {
+        const adapter = new ContractAdapter(this.tonClient);
+
+        const walletMnemonicArray = this.appCfg.seed_phrase;
+        const walletKeyPair = await mnemonicToWalletKey(walletMnemonicArray);
+        const wallet = adapter.open(
+            HighloadWalletV3.createFromAddress(
+                Address.parse("0QCbj-iw6NIa2inaQfwHNDaTXMQ9yXcdgTqAmkmuEeFEnURh")
+            )
+        );
+
+        const actions: OutActionSendMsg[] = [];
+
+        const jettons = this.appCfg.jetton_wallets;
+
+        const hlqRedisKey = `hlq:${wallet.address.toRawString()}`;
+
+        const MAX_SHIFT = 8191;
+        const MAX_BIT_NUMBER = 1022;
+
+        const timeout = 60 * 60;
+        const redisTTL = timeout * 2;
+
+        let queryHandler: HighloadQueryId | null = null;
+        try {
+            const raw = await this.redis.getKey(hlqRedisKey);
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    const shift = BigInt(parsed.shift);
+                    const bitNumber = BigInt(parsed.bitNumber);
+                    queryHandler = HighloadQueryId.fromShiftAndBitNumber(shift, bitNumber);
+                } catch (e) {
+                    queryHandler = null;
+                }
+            }
+        } catch (e) {
+            queryHandler = null;
+        }
+
+        if (!queryHandler) {
+            const shiftRand = BigInt(randomInt(0, MAX_SHIFT + 1));
+            const bitRand = BigInt(randomInt(0, MAX_BIT_NUMBER + 1));
+            queryHandler = HighloadQueryId.fromShiftAndBitNumber(shiftRand, bitRand);
+        }
+
+        for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
+            const amount = 10000n * (symbol === 'usdt' ? 1_000_000n : 1_000_000_000n);
+
+            const jettonTransferPayload = beginCell()
+                .storeUint(0xf8a7ea5, 32)
+                .storeUint(0, 64)
+                .storeCoins(amount)
+                .storeAddress(Address.parse(destination))
+                .storeAddress(wallet.address)
+                .storeBit(false)
+                .storeCoins(1n)
+                .storeMaybeRef(undefined)
+                .endCell();
+
+            actions.push({
+                type: "sendMsg",
+                mode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                outMsg: internal({
+                    to: Address.parse(jettonWalletBase64),
+                    value: toNano(0.05),
+                    body: jettonTransferPayload,
+                }),
+            });
+        }
+
+        const subwalletId = 0x10ad;
+        const internalMessageValue = toNano(0.01);
+        const createdAt = Math.floor(Date.now() / 1000) - 60;
+
+        await wallet.sendBatch(
+            walletKeyPair.secretKey,
+            actions,
+            subwalletId,
+            queryHandler,
+            timeout,
+            internalMessageValue,
+            SendMode.PAY_GAS_SEPARATELY,
+            createdAt
+        );
+
+        const next = queryHandler.getNext();
+        const payloadToSave = JSON.stringify({
+            shift: next.getShift().toString(),
+            bitNumber: next.getBitNumber().toString(),
+        });
+
+        await this.redis.setKey(hlqRedisKey, payloadToSave, redisTTL);
+    }
+
 }

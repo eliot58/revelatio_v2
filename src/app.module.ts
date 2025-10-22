@@ -11,7 +11,6 @@ import { TelegramModule } from './telegram/telegram.module';
 import { LinksModule } from './links/links.module';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
-import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -25,13 +24,7 @@ import { BullModule } from '@nestjs/bullmq';
     AuthModule,
     NotificationsModule,
     TelegramModule,
-    LinksModule,
-    BullModule.forRoot({
-      connection: {
-        host: '127.0.0.1',
-        port: 6379,
-      },
-    }),
+    LinksModule
   ],
   controllers: [AppController],
   providers: [

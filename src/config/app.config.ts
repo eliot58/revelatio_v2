@@ -19,10 +19,10 @@ export default registerAs('app', () => ({
     },
     seed_phrase: "gentle shove witness exact talent soap pipe piece tiny group peace clock receive local spot pipe assume upon omit sense swing begin switch digital".split(" "),
     jetton_wallets: {
-        grc: "kQC-LHUbouWn6Qb6notqQ2wF9jTVZEtB-1pLH_EATNcLaGbi",
-        not: "kQABR61tNJBTlA6ja00noHceABSuxiS2PGsCQcUWqlpRHj93",
-        dogs: "kQD8AOZYlUtscmeeBhKzfGwURuiIX_hT8ySFkssFLxJXdpUl",
-        usdt: "kQDbuVuj9Rbq0bN9jdDn3sXupf9HAJwpgfmBvw-0DqXGc-NC",
-        px: "kQDq3uP7jHuJ4JEH7ShjNtLJ_LoiGJRbIHa4ebnA4cSvZ9xu"
+        grc: "kQCCHI5a-McEk8iNlu81LYwW3UzYT4ahYDpXBGiH4jLXFTRi",
+        not: "kQCzUJSF9PDvJd7DMDe0MIo5kmO8TzoYgzx8jFNr49bQc5Gb",
+        dogs: "kQBvZvwpGlEfkur4_MceSC6w5ww1Xe9OjGa5rRrHGncDruQQ",
+        usdt: "kQDvHLwdZfTmzsLv1kQvKOLkK1KJaW-78Sa0dpPJqenGcyhy",
+        px: "kQC0CMTv0JhUSQXsqAZEWQa9dobB_NU1u59pmFhTN1NfVXd6"
     }
 }));
