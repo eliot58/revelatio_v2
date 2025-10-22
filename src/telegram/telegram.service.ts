@@ -77,11 +77,11 @@ export class TelegramService {
 
                 const cache = await this.redis.getKey(`get:${address.toRawString()}`);
                 if (cache) {
-                    await ctx.reply('You can only request jettons once per 20 minutes. Please try again later.');
+                    await ctx.reply('You can only request jettons once per 60 minutes. Please try again later.');
                     return;
                 }
 
-                await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200);
+                await this.redis.setKey(`get:${address.toRawString()}`, "1", 60 * 60);
             } catch {
                 await ctx.reply('❌ Invalid TON address. Please try again.');
                 return;
