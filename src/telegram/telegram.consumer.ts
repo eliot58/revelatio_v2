@@ -16,8 +16,6 @@ export class TelegramConsumer extends WorkerHost {
     @Inject("TESTNET_TONAPI_CLIENT") private readonly tonClient: TonApiClient
   ) {
     super();
-
-    this.worker.concurrency = 1;
   }
 
   async process(job: Job<{ destination: string; coins: "not" | "px" | "dogs" | "usdt" | "grc"; jettonWallet: string }>) {

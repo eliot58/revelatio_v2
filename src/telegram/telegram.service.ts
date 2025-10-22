@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import appConfig from '../config/app.config';
 import { ConfigType } from '@nestjs/config';
@@ -10,13 +10,18 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
 @Injectable()
-export class TelegramService {
+export class TelegramService implements OnModuleInit {
     constructor(
         @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
         @InjectQueue('telegram') private readonly telegramQueue: Queue,
         private readonly prisma: PrismaService,
         private readonly redis: RedisService
     ) { }
+
+    async onModuleInit() {
+        await this.telegramQueue.setGlobalConcurrency(1);
+    }
+
 
     register(bot: Bot) {
         bot.command('test_invite', async (ctx) => {
@@ -70,7 +75,7 @@ export class TelegramService {
                         destination: wallet,
                         coins: symbol,
                         jettonWallet: jettonWalletBase64
-                    }, { delay: 10000 },);
+                    }, { delay: 20000 },);
                 }
 
                 await ctx2.reply('✅ Jetton transfers have been added to the queue. Please wait for processing.');

@@ -15,7 +15,7 @@ import { TelegramConsumer } from './telegram.consumer';
     PrismaModule,
     RedisModule,
     TonModule.forRootAsync(),
-    BullModule.registerQueue({ name: 'telegram', }),
+    BullModule.registerQueue({ name: 'telegram' }),
   ],
   providers: [
     {
