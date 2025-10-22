@@ -5,17 +5,15 @@ import { ConfigType } from '@nestjs/config';
 import { Chat } from '../../generated/prisma';
 import { Bot } from 'grammy';
 import { Address } from '@ton/core';
-import { TonApiClient } from '@ton-api/client';
-import { ContractAdapter } from '@ton-api/ton-adapter';
-import { mnemonicToPrivateKey } from '@ton/crypto';
-import { SendMode, WalletContractV5R1, beginCell, internal, toNano } from '@ton/ton';
 import { RedisService } from '../redis/redis.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class TelegramService {
     constructor(
         @Inject(appConfig.KEY) private readonly appCfg: ConfigType<typeof appConfig>,
-        @Inject("TESTNET_TONAPI_CLIENT") private readonly tonClient: TonApiClient,
+        @InjectQueue('telegram') private readonly telegramQueue: Queue,
         private readonly prisma: PrismaService,
         private readonly redis: RedisService
     ) { }
@@ -50,23 +48,32 @@ export class TelegramService {
                 const wallet = ctx2.message.text.trim();
 
                 try {
-                    Address.parse(wallet);
+                    const address = Address.parse(wallet);
 
-                    // const cache = await this.redis.getKey(`get:${address.toRawString()}`)
+                    const cache = await this.redis.getKey(`get:${address.toRawString()}`)
 
-                    // if (cache) {
-                    //     await ctx2.reply('Please try again after 20 minute.');
-                    //     return;
-                    // }
+                    if (cache) {
+                        await ctx2.reply('Please try again after 20 minute.');
+                        return;
+                    }
 
-                    // await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
+                    await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
                 } catch {
                     await ctx2.reply('❌ Invalid TON address. Please try again.');
                     return;
                 }
 
-                await this.sendJettons(wallet)
-                await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
+                const jettons = this.appCfg.jetton_wallets;
+
+                for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
+                    await this.telegramQueue.add('send_jetton', {
+                        destination: wallet,
+                        coins: symbol,
+                        jettonWallet: jettonWalletBase64
+                    });
+                }
+
+                await ctx2.reply('✅ Jetton transfers have been added to the queue. Please wait for processing.');
             });
         });
 
@@ -127,51 +134,5 @@ export class TelegramService {
                 }
             }
         });
-    }
-
-    async sendJettons(destination: string) {
-        const adapter = new ContractAdapter(this.tonClient);
-
-        const keyPair = await mnemonicToPrivateKey(this.appCfg.seed_phrase);
-
-        const wallet = WalletContractV5R1.create({ publicKey: keyPair.publicKey, walletId: { networkGlobalId: -3 }});
-        const contract = adapter.open(wallet);
-
-        console.log(wallet.address.toRawString())
-
-        const jettons = this.appCfg.jetton_wallets;
-
-        for (const [symbol, jettonWalletBase64] of Object.entries(jettons)) {
-            const jettonWallet = Address.parse(jettonWalletBase64);
-
-            const amount = 10000n * (symbol === 'usdt' ? 1_000_000n : 1_000_000_000n);
-
-            const jettonTransferPayload = beginCell()
-            .storeUint(0xf8a7ea5, 32)
-            .storeUint(0, 64) 
-            .storeCoins(amount)
-            .storeAddress(Address.parse(destination))
-            .storeAddress(wallet.address)
-            .storeBit(false)
-            .storeCoins(1n)
-            .storeMaybeRef(undefined)
-            .endCell();
-
-        const seqno = await contract.getSeqno();
-
-        await contract.sendTransfer({
-            seqno,
-            secretKey: keyPair.secretKey,
-            sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-            messages: [
-                internal({
-                    to: jettonWallet,
-                    value: toNano(0.05),
-                    body: jettonTransferPayload
-                })
-            ]
-        });
-
-        }
     }
 }

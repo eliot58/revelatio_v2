@@ -7,12 +7,15 @@ import appConfig from '../config/app.config';
 import { TonModule } from '../ton/ton.module';
 import { RedisModule } from '../redis/redis.module';
 import { Bot } from 'grammy';
+import { BullModule } from '@nestjs/bullmq';
+import { TelegramConsumer } from './telegram.consumer';
 
 @Module({
   imports: [
     PrismaModule,
     RedisModule,
-    TonModule.forRootAsync()
+    TonModule.forRootAsync(),
+    BullModule.registerQueue({ name: 'telegram', }),
   ],
   providers: [
     {
@@ -24,6 +27,7 @@ import { Bot } from 'grammy';
       },
     },
     TelegramService,
+    TelegramConsumer
   ],
   controllers: [TelegramController],
   exports: ['TELEGRAM_BOT'],
