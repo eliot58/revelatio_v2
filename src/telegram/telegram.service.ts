@@ -70,7 +70,7 @@ export class TelegramService {
                         destination: wallet,
                         coins: symbol,
                         jettonWallet: jettonWalletBase64
-                    });
+                    }, { delay: 10000 },);
                 }
 
                 await ctx2.reply('✅ Jetton transfers have been added to the queue. Please wait for processing.');
