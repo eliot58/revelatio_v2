@@ -40,38 +40,59 @@ export class TelegramService {
         });
 
         bot.command('get', async (ctx) => {
-            if (ctx.chat.type !== 'private') {
+            if (ctx.chat.type !== 'private') return;
+
+            const userId = ctx.from?.id;
+            if (!userId) return;
+
+            const awaitingKey = `awaiting:get:${userId}`;
+            const WAIT_TTL = 5 * 60;
+
+            const existing = await this.redis.getKey(awaitingKey);
+            if (existing) {
+                await ctx.reply("I'm already waiting for your wallet address. Please send it.");
                 return;
             }
 
+            await this.redis.setKey(awaitingKey, "1", WAIT_TTL);
             await ctx.reply('Please send your test TON wallet address:');
-            bot.on('message:text', async (ctx2) => {
-                if (ctx2.chat.type !== 'private') {
+        });
+
+        bot.on('message:text', async (ctx) => {
+            if (ctx.chat.type !== 'private') return;
+
+            const userId = ctx.from?.id;
+            if (!userId) return;
+
+            const awaitingKey = `awaiting:get:${userId}`;
+            const isWaiting = await this.redis.getKey(awaitingKey);
+            if (!isWaiting) return;
+
+            await this.redis.deleteKey(awaitingKey);
+
+            const wallet = ctx.message.text.trim();
+
+            try {
+                const address = Address.parse(wallet);
+
+                const cache = await this.redis.getKey(`get:${address.toRawString()}`);
+                if (cache) {
+                    await ctx.reply('You can only request jettons once per 20 minutes. Please try again later.');
                     return;
                 }
 
-                const wallet = ctx2.message.text.trim();
+                await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200);
+            } catch {
+                await ctx.reply('❌ Invalid TON address. Please try again.');
+                return;
+            }
 
-                try {
-                    const address = Address.parse(wallet);
-
-                    const cache = await this.redis.getKey(`get:${address.toRawString()}`)
-
-                    if (cache) {
-                        await ctx2.reply('Please try again after 20 minute.');
-                        return;
-                    }
-
-                    await this.redis.setKey(`get:${address.toRawString()}`, "1", 1200)
-                } catch {
-                    await ctx2.reply('❌ Invalid TON address. Please try again.');
-                    return;
-                }
-
+            try {
                 await this.sendJettons(wallet);
-
-                await ctx2.reply(`✅ Jettons have been successfully sent to ${wallet}`);
-            });
+                await ctx.reply(`✅ Jettons have been successfully sent to ${wallet}`);
+            } catch (e) {
+                await ctx.reply('❌ Error sending jettons. Please try again later.');
+            }
         });
 
         bot.on('chat_join_request', async (ctx) => {
