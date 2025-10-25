@@ -227,7 +227,7 @@ export class NotificationsService {
 
         const lastHash = await this.redis.getKey(redisKey);
 
-        const url = `https://api.geckoterminal.com/api/v2/networks/ton/pools/${poolAddrStr}/trades?trade_volume_in_usd_greater_than=100&token=${tokenAddr}`;
+        const url = `https://api.geckoterminal.com/api/v2/networks/ton/pools/${poolAddrStr}/trades?trade_volume_in_usd_greater_than=1&token=${tokenAddr}`;
         const { data } = await firstValueFrom(
             this.http.get(url, { headers: { accept: 'application/json' } }),
         );
