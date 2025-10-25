@@ -219,7 +219,7 @@ export class NotificationsService {
         });
     }
 
-    @Interval(180000)
+    @Interval(5000)
     async handleJettonPool() {
         const poolAddrStr = 'EQAdn2BoPvqOZ6ptXBXpoZ8pXhJMR0KQMxZuEcK-6J_oO5Vs';
         const tokenAddr = 'EQAu7qxfVgMg0tpnosBpARYOG--W1EUuX_5H_vOQtTVuHnrn';
@@ -231,6 +231,8 @@ export class NotificationsService {
         const { data } = await firstValueFrom(
             this.http.get(url, { headers: { accept: 'application/json' } }),
         );
+
+        console.log(data)
         let trades: any[] = data;
 
         if (!trades || trades.length === 0) return;
