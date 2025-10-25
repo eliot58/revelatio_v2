@@ -232,8 +232,7 @@ export class NotificationsService {
             this.http.get(url, { headers: { accept: 'application/json' } }),
         );
 
-        console.log(data)
-        let trades: any[] = data;
+        let trades: any[] = data["data"];
 
         if (!trades || trades.length === 0) return;
 
