@@ -204,6 +204,8 @@ export class NotificationsService {
         price: string,
         txHash: string,
     ): Promise<void> {
+        if (price === "1.000000") return;
+
         const txLink = `https://tonviewer.com/transaction/${txHash}`;
 
         const message =
@@ -211,7 +213,7 @@ export class NotificationsService {
             `<b>${tonIn} 💎</b> → <b>${grcOut} 🍐</b>\n` +
             `Price: <b>${price} 💎</b>`;
 
-        await this.bot.api.sendMessage(-1002936541860, message, {
+        await this.bot.api.sendMessage(-1003007629863, message, {
             parse_mode: 'HTML',
             link_preview_options: {
                 is_disabled: true
@@ -219,48 +221,64 @@ export class NotificationsService {
         });
     }
 
-    @Interval(5000)
+    @Interval(180000)
     async handleJettonPool() {
         const poolAddrStr = 'EQAdn2BoPvqOZ6ptXBXpoZ8pXhJMR0KQMxZuEcK-6J_oO5Vs';
-        const tokenAddr = 'EQAu7qxfVgMg0tpnosBpARYOG--W1EUuX_5H_vOQtTVuHnrn';
-        const redisKey = `lastHash:${poolAddrStr}`;
+        const address = Address.parse(poolAddrStr);
 
-        const lastHash = await this.redis.getKey(redisKey);
+        const cache = await this.redis.getKey(`lastLt:${poolAddrStr}`);
+        let lastLt: bigint | undefined = undefined;
+        if (cache) lastLt = BigInt(cache);
 
-        const url = `https://api.geckoterminal.com/api/v2/networks/ton/pools/${poolAddrStr}/trades?trade_volume_in_usd_greater_than=1&token=${tokenAddr}`;
-        const { data } = await firstValueFrom(
-            this.http.get(url, { headers: { accept: 'application/json' } }),
-        );
+        const res = await this.tonClient.blockchain.getBlockchainAccountTransactions(address, { limit: 50, after_lt: lastLt });
 
-        let trades: any[] = data["data"];
+        if (res.transactions.length === 0) return;
+        
+        const firstLt = res.transactions[0].lt.toString()
 
-        if (!trades || trades.length === 0) return;
-
-        if (lastHash) {
-            const index = trades.findIndex(t => t.attributes.tx_hash === lastHash);
-            if (index !== -1) trades = trades.slice(index + 1);
+        if (!cache) {
+            await this.redis.setKey(`lastLt:${poolAddrStr}`, firstLt);
+            return;
         }
 
-        for (const trade of trades.reverse()) {
-            const attrs = trade.attributes;
+        for (const tx of res.transactions.reverse()) {
+            if (!tx.success) continue;
 
-            if (attrs.kind !== 'buy') continue;
+            if (tx.inMsg?.decodedOpName !== 'stonfi_swap') continue;
 
-            const fromAmount = Number(attrs.from_token_amount);
-            const toAmount = Number(attrs.to_token_amount);
-            const price = fromAmount / toAmount;
+            if (!Array.isArray(tx.outMsgs) || tx.outMsgs.length === 0) continue;
 
-            const fromStr = fromAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const toStr = toAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const priceStr = price.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+            const lastOut = tx.outMsgs[tx.outMsgs.length - 1];
 
-            await this.sendSwapNotification(fromStr, toStr, priceStr, attrs.tx_hash);
+            if (lastOut?.decodedOpName !== 'stonfi_payment_request') continue;
+
+            const amount0OutStr = lastOut.decodedBody["params"]["value"]["amount0_out"];
+            if (amount0OutStr === '0') continue;
+
+            const txHash = tx.hash;
+            const tonIn = Number(tx.inMsg.decodedBody["jetton_amount"]);
+            const grcOut = Number(amount0OutStr);
+            const price = tonIn / grcOut;
+
+            if (100000000000 > tonIn) continue;
+
+            const tonStr = (tonIn / 1e9).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            const grcStr = (grcOut / 1e9).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            const priceStr = Number(price).toLocaleString(undefined, {
+                minimumFractionDigits: 6,
+                maximumFractionDigits: 6,
+            });
+
+            await this.sendSwapNotification(tonStr, grcStr, priceStr, txHash);
         }
 
-        const lastTrade = trades[trades.length - 1];
-        if (lastTrade) {
-            await this.redis.setKey(redisKey, lastTrade.attributes.tx_hash);
-        }
+        await this.redis.setKey(`lastLt:${poolAddrStr}`, firstLt);
     }
 
 
